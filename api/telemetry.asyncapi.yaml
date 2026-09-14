@@ -1,0 +1,36 @@
+asyncapi: 3.1.0
+info:
+  title: telemetry events
+  version: 1.0.0
+  description: уведомление о новом измерении, device-service публикует, telemetry-service читает
+
+channels:
+  deviceTelemetry:
+    address: device.telemetry
+    messages:
+      measurement:
+        contentType: application/json
+        payload:
+          type: object
+          required: [device_id, metric, value, recorded_at]
+          properties:
+            device_id: { type: string, format: uuid }
+            metric: { type: string }
+            value: { type: number }
+            unit: { type: string }
+            recorded_at: { type: string, format: date-time }
+        examples:
+          - payload:
+              device_id: 7d6c5b4a-3928-4716-a5b4-c3d2e1f0a9b8
+              metric: temperature
+              value: 21.5
+              unit: °C
+              recorded_at: "2026-09-13T10:20:00Z"
+
+operations:
+  publishMeasurement:
+    action: send
+    channel:
+      $ref: "#/channels/deviceTelemetry"
+    messages:
+      - $ref: "#/channels/deviceTelemetry/messages/measurement"

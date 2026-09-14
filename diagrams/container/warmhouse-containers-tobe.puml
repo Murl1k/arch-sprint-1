@@ -1,0 +1,53 @@
+@startuml warmhouse-containers-tobe
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Container.puml
+
+title диаграмма контейнеров to-be
+
+Person(user, "пользователь", "владелец дома, сам подключает устройства и управляет ими")
+System_Ext(devices, "устройства партнёров", "датчики, реле отопления, освещение, ворота, камеры, подключены к интернету в доме")
+
+System_Boundary(eco, "экосистема умного дома (saas)") {
+    Container(web, "web-приложение", "spa", "личный кабинет: дома, устройства, управление, телеметрия")
+
+    Container(user_svc, "user-service", "go", "пользователи, аутентификация, дома")
+    Container(device_svc, "device-service", "go", "подключение устройств, каталог типов, состояние, команды, сценарии автоматизации, адаптеры протоколов партнёров, проверка доступа к устройствам")
+    Container(telemetry_svc, "telemetry-service", "go", "хранение и выдача телеметрии")
+    Container(heating_svc, "heating-service", "go", "управление отоплением")
+    Container(lighting_svc, "lighting-service", "go", "управление освещением")
+    Container(gate_svc, "gate-service", "go", "ворота: открыть, закрыть, запереть, отпереть")
+    Container(surveillance_svc, "surveillance-service", "go", "видеонаблюдение")
+
+    ContainerQueue(broker, "брокер сообщений", "pub/sub", "device.telemetry")
+
+    ContainerDb(user_db, "user-db", "postgresql", "пользователи, дома")
+    ContainerDb(device_db, "device-db", "postgresql", "устройства, модули, типы устройств, сценарии")
+    ContainerDb(telemetry_db, "telemetry-db", "postgresql", "телеметрия")
+}
+
+Rel(user, web, "использует", "https")
+Rel(web, user_svc, "вход, дома", "rest")
+Rel(web, device_svc, "подключение и данные устройств, сценарии", "rest")
+Rel(web, heating_svc, "отопление", "rest")
+Rel(web, lighting_svc, "освещение", "rest")
+Rel(web, gate_svc, "ворота", "rest")
+Rel(web, surveillance_svc, "видео", "rest")
+Rel(web, telemetry_svc, "история телеметрии", "rest")
+
+Rel(device_svc, user_svc, "дома пользователя для проверки доступа", "rest")
+Rel(heating_svc, device_svc, "состояние и команды реле", "rest")
+Rel(lighting_svc, device_svc, "состояние и команды освещения", "rest")
+Rel(gate_svc, device_svc, "команды воротам", "rest")
+Rel(surveillance_svc, device_svc, "данные камеры", "rest")
+Rel(surveillance_svc, devices, "получает видеопоток", "https")
+
+BiRel(device_svc, devices, "команды и телеметрия", "https, протоколы партнёров")
+Rel(device_svc, broker, "публикует телеметрию", "pub/sub")
+Rel(broker, telemetry_svc, "device.telemetry", "pub/sub")
+Rel(telemetry_svc, device_svc, "проверяет доступ к устройству", "rest")
+
+Rel(user_svc, user_db, "читает и пишет", "sql")
+Rel(device_svc, device_db, "читает и пишет", "sql")
+Rel(telemetry_svc, telemetry_db, "читает и пишет", "sql")
+
+SHOW_LEGEND()
+@enduml

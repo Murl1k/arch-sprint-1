@@ -1,0 +1,21 @@
+@startuml heating-service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title heating-service: диаграмма компонентов
+
+Container(web, "web-приложение", "spa")
+Container(device_svc, "device-service", "go")
+
+Container_Boundary(svc, "heating-service") {
+    Component(api, "rest api", "go", "/heating/{deviceId}/power, /heating/{deviceId}/temperature")
+    Component(heating, "HeatingService", "go", "включение, выключение и целевая температура, проверяет, что устройство относится к отоплению")
+    Component(client, "DeviceClient", "go", "GET /devices/{id}, PATCH /devices/{id}/state, POST /devices/{id}/commands")
+}
+
+Rel(web, api, "управление отоплением", "rest")
+Rel(api, heating, "вызывает")
+Rel(heating, client, "проверка устройства, состояние, команды")
+Rel(client, device_svc, "rest")
+
+SHOW_LEGEND()
+@enduml

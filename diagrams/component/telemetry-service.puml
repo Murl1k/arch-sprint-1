@@ -1,0 +1,29 @@
+@startuml telemetry-service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title telemetry-service: диаграмма компонентов
+
+Container(web, "web-приложение", "spa")
+Container(device_svc, "device-service", "go")
+ContainerQueue(broker, "брокер сообщений", "pub/sub")
+ContainerDb(db, "telemetry-db", "postgresql", "telemetry_data")
+
+Container_Boundary(svc, "telemetry-service") {
+    Component(api, "rest api", "go", "/devices/{deviceId}/telemetry")
+    Component(client, "DeviceClient", "go", "GET /devices/{id} с токеном пользователя: устройство из дома пользователя")
+    Component(consumer, "TelemetryConsumer", "go", "читает device.telemetry")
+    Component(telemetry, "TelemetryService", "go", "запись измерений и выборка истории")
+    Component(repo, "Repository", "go", "доступ к измерениям")
+}
+
+Rel(web, api, "история телеметрии с токеном пользователя", "rest")
+Rel(api, client, "проверка доступа к устройству")
+Rel(client, device_svc, "rest")
+Rel(broker, consumer, "device.telemetry", "pub/sub")
+Rel(api, telemetry, "выборка")
+Rel(consumer, telemetry, "новое измерение")
+Rel(telemetry, repo, "читает и пишет")
+Rel(repo, db, "читает и пишет", "sql")
+
+SHOW_LEGEND()
+@enduml

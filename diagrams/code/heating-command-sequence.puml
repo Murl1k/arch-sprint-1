@@ -1,0 +1,44 @@
+@startuml heating-command-sequence
+title включение отопления (уровень кода, последовательность)
+
+autonumber
+actor "пользователь" as user
+participant "web-приложение" as web
+participant "heating-service" as heating
+participant "device-service" as devsvc
+participant "адаптер протокола" as adapter
+participant "реле отопления" as relay
+participant "датчик температуры" as sensor
+queue "брокер сообщений" as broker
+participant "telemetry-service" as tel
+
+user -> web : включает отопление
+web -> heating : POST /heating/{deviceId}/power (on: true)
+heating -> devsvc : GET /devices/{deviceId}
+devsvc --> heating : 200 (category: heating)
+heating -> devsvc : PATCH /devices/{deviceId}/state (status: on)
+devsvc -> devsvc : CommandHandler проверяет команду по типу устройства
+devsvc -> adapter : set_power (on: true)
+adapter -> relay : команда в протоколе партнёра
+alt реле ответило
+    relay --> adapter : подтверждение
+    adapter --> devsvc : ok
+    devsvc -> devsvc : DeviceStateManager сохраняет status: on
+    devsvc --> heating : 200 (status: on)
+    heating --> web : 200
+    web --> user : отопление включено
+else реле недоступно
+    adapter --> devsvc : ошибка связи
+    devsvc --> heating : 503
+    heating --> web : 503
+    web --> user : устройство недоступно
+end
+
+== телеметрия ==
+
+sensor -> adapter : температура (протокол партнёра)
+adapter -> devsvc : измерение
+devsvc -> broker : device.telemetry (device_id, temperature, 21.5)
+broker -> tel : device.telemetry
+tel -> tel : сохраняет измерение
+@enduml

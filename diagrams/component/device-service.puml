@@ -1,0 +1,52 @@
+@startuml device-service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title device-service: диаграмма компонентов
+
+Container(web, "web-приложение", "spa")
+Container(other_svcs, "другие сервисы", "go", "heating, lighting, gate, surveillance, telemetry")
+Container(user_svc, "user-service", "go")
+System_Ext(devices, "устройства партнёров")
+ContainerQueue(broker, "брокер сообщений", "pub/sub")
+ContainerDb(db, "device-db", "postgresql", "devices, modules, device_types, scenarios, scenario_actions")
+
+Container_Boundary(svc, "device-service") {
+    Component(api, "rest api", "go", "/devices, /devices/{id}, /devices/{id}/state, /devices/{id}/commands, /scenarios")
+    Component(access, "AccessGuard", "go", "проверяет токен пользователя и что дом устройства принадлежит пользователю")
+    Component(registration, "RegistrationService", "go", "подключение устройства к дому пользователя по серийному номеру и типу")
+    Component(catalog, "DeviceTypeCatalog", "go", "каталог типов: протокол, метрики и команды, новый тип датчика добавляется записью")
+    Component(commands, "CommandHandler", "go", "обработчик команд: проверяет команду по типу устройства и отправляет её")
+    Component(state, "DeviceStateManager", "go", "менеджер состояния устройств")
+    Component(scenarios, "ScenarioService", "go", "создание и изменение сценариев: условие или расписание и действия с устройствами")
+    Component(engine, "ScenarioEngine", "go", "проверяет условия по измерениям и расписанию, запускает действия сценария")
+    Component(adapters, "ProtocolAdapters", "go", "адаптеры протоколов партнёров, новый протокол добавляется новым адаптером")
+    Component(telemetry, "TelemetryPublisher", "go", "публикует измерения устройств")
+    Component(repo, "Repository", "go", "доступ к устройствам, модулям, типам и сценариям")
+}
+
+Rel(web, api, "устройства и сценарии", "rest")
+Rel(other_svcs, api, "данные, состояние и команды с токеном пользователя", "rest")
+Rel(api, access, "проверка доступа")
+Rel(access, user_svc, "дома пользователя", "rest")
+Rel(api, registration, "подключение")
+Rel(api, state, "данные и состояние")
+Rel(api, commands, "команда")
+Rel(api, scenarios, "сценарии")
+Rel(registration, catalog, "проверяет тип")
+Rel(state, commands, "включение и выключение")
+Rel(commands, catalog, "проверяет команду")
+Rel(commands, adapters, "отправляет команду")
+BiRel(adapters, devices, "команды и данные", "https, протоколы партнёров")
+Rel(adapters, telemetry, "измерения")
+Rel(adapters, engine, "измерения")
+Rel(engine, commands, "действия сценария")
+Rel(telemetry, broker, "device.telemetry", "pub/sub")
+Rel(registration, repo, "сохраняет устройство")
+Rel(catalog, repo, "читает типы")
+Rel(state, repo, "читает и пишет состояние")
+Rel(scenarios, repo, "читает и пишет сценарии")
+Rel(engine, repo, "активные сценарии")
+Rel(repo, db, "читает и пишет", "sql")
+
+SHOW_LEGEND()
+@enduml
