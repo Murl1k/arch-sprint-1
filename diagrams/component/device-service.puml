@@ -1,0 +1,49 @@
+@startuml device-service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title device-service: диаграмма компонентов
+
+Container(api_gw, "api gateway", "nginx")
+Container(other_svcs, "другие сервисы", "go", "heating, lighting, gate, surveillance, telemetry, device-gateway")
+Container(user_svc, "user-service", "go")
+ContainerQueue(mqtt, "mqtt-брокер", "mqtt")
+ContainerDb(db, "device-db", "postgresql", "devices, modules, device_types, scenarios, scenario_actions")
+
+Container_Boundary(svc, "device-service") {
+    Component(api, "rest api", "go", "/devices, /devices/{id}, /devices/{id}/state, /devices/{id}/commands, /scenarios")
+    Component(access, "AccessGuard", "go", "проверяет, что дом устройства принадлежит пользователю")
+    Component(registration, "RegistrationService", "go", "подключение устройства к дому пользователя по серийному номеру и типу")
+    Component(catalog, "DeviceTypeCatalog", "go", "каталог типов: протокол, метрики и команды, новый тип датчика добавляется записью")
+    Component(commands, "CommandHandler", "go", "проверяет команду по типу устройства, отправляет её и ждёт подтверждение")
+    Component(state, "DeviceStateManager", "go", "текущее состояние устройств")
+    Component(scenarios, "ScenarioService", "go", "создание и изменение сценариев: условие или расписание и действия с устройствами")
+    Component(engine, "ScenarioEngine", "go", "проверяет условия по телеметрии и расписанию, запускает действия сценария")
+    Component(mqtt_client, "MqttClient", "go", "публикует команды, получает подтверждения, состояние и телеметрию")
+    Component(repo, "Repository", "go", "доступ к устройствам, модулям, типам и сценариям")
+}
+
+Rel(api_gw, api, "запросы пользователя", "rest")
+Rel(other_svcs, api, "данные устройств, состояние, команды", "rest")
+Rel(api, access, "проверка доступа")
+Rel(access, user_svc, "дома пользователя", "rest")
+Rel(api, registration, "подключение")
+Rel(api, state, "данные и состояние")
+Rel(api, commands, "команда")
+Rel(api, scenarios, "сценарии")
+Rel(registration, catalog, "проверяет тип")
+Rel(state, commands, "включение и выключение")
+Rel(commands, catalog, "проверяет команду")
+Rel(commands, mqtt_client, "команда")
+BiRel(mqtt_client, mqtt, "devices/{id}/commands; replies, state, telemetry", "mqtt")
+Rel(mqtt_client, state, "новое состояние")
+Rel(mqtt_client, engine, "телеметрия")
+Rel(engine, commands, "действия сценария")
+Rel(registration, repo, "сохраняет устройство")
+Rel(catalog, repo, "читает типы")
+Rel(state, repo, "читает и пишет состояние")
+Rel(scenarios, repo, "читает и пишет сценарии")
+Rel(engine, repo, "активные сценарии")
+Rel(repo, db, "читает и пишет", "sql")
+
+SHOW_LEGEND()
+@enduml

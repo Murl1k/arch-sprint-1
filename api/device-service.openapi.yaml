@@ -1,0 +1,411 @@
+openapi: 3.2.1
+info:
+  title: device-service api
+  version: 1.0.0
+  description: |
+    подключение устройств, данные устройства, обновление состояния и команды
+
+    доступ: запрос приходит через api gateway с токеном пользователя, device-service работает только с устройствами из домов пользователя, дома берёт из user-service, чужое устройство даёт 404
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /devices:
+    post:
+      operationId: registerDevice
+      summary: подключить устройство
+      description: пользователь сам подключает устройство к своему дому по серийному номеру и типу из каталога
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceCreate"
+            examples:
+              heatingRelay:
+                summary: реле отопления
+                value:
+                  house_id: 3f0e8f2a-5b7c-4d1e-9a6b-2c4d8e1f0a11
+                  type_code: heating_relay
+                  serial_number: WH-HR-000123
+                  name: котёл
+      responses:
+        "201":
+          description: устройство подключено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+              examples:
+                created:
+                  value:
+                    id: 5c9a7e21-0d3b-4f8e-a1c2-7b6d5e4f3a21
+                    house_id: 3f0e8f2a-5b7c-4d1e-9a6b-2c4d8e1f0a11
+                    module_id: null
+                    type:
+                      code: heating_relay
+                      name: реле отопления
+                      category: heating
+                    serial_number: WH-HR-000123
+                    name: котёл
+                    status: "off"
+                    created_at: "2026-09-13T10:15:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: дом не принадлежит пользователю
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                foreignHouse:
+                  value:
+                    code: house_access_denied
+                    message: нет доступа к дому 3f0e8f2a-5b7c-4d1e-9a6b-2c4d8e1f0a11
+        "404":
+          description: тип устройства не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                typeNotFound:
+                  value:
+                    code: device_type_not_found
+                    message: тип устройства heating_relay_v9 не найден
+        "409":
+          description: устройство с таким серийным номером уже подключено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                serialTaken:
+                  value:
+                    code: serial_number_taken
+                    message: устройство WH-HR-000123 уже подключено
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /devices/{deviceId}:
+    get:
+      operationId: getDevice
+      summary: получить информацию об устройстве
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      responses:
+        "200":
+          description: устройство найдено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+              examples:
+                heatingRelay:
+                  value:
+                    id: 5c9a7e21-0d3b-4f8e-a1c2-7b6d5e4f3a21
+                    house_id: 3f0e8f2a-5b7c-4d1e-9a6b-2c4d8e1f0a11
+                    module_id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                    type:
+                      code: heating_relay
+                      name: реле отопления
+                      category: heating
+                    serial_number: WH-HR-000123
+                    name: котёл
+                    status: "on"
+                    created_at: "2026-09-13T10:15:00Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /devices/{deviceId}/state:
+    patch:
+      operationId: updateDeviceState
+      summary: обновить состояние устройства
+      description: включает или выключает устройство, device-service публикует команду в mqtt, device-gateway передаёт её устройству, после подтверждения статус сохраняется
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceStateUpdate"
+            examples:
+              turnOn:
+                summary: включить
+                value:
+                  status: "on"
+      responses:
+        "200":
+          description: состояние обновлено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+              examples:
+                turnedOn:
+                  value:
+                    id: 5c9a7e21-0d3b-4f8e-a1c2-7b6d5e4f3a21
+                    house_id: 3f0e8f2a-5b7c-4d1e-9a6b-2c4d8e1f0a11
+                    module_id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                    type:
+                      code: heating_relay
+                      name: реле отопления
+                      category: heating
+                    serial_number: WH-HR-000123
+                    name: котёл
+                    status: "on"
+                    created_at: "2026-09-13T10:15:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/DeviceUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /devices/{deviceId}/commands:
+    post:
+      operationId: sendCommand
+      summary: отправить команду устройству
+      description: команда проверяется по списку команд типа устройства и публикуется в mqtt, device-gateway передаёт её устройству и возвращает подтверждение
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandRequest"
+            examples:
+              setTemperature:
+                summary: задать температуру
+                value:
+                  command: set_temperature
+                  params:
+                    value: 22
+              openGate:
+                summary: открыть ворота
+                value:
+                  command: open
+      responses:
+        "200":
+          description: команда выполнена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+              examples:
+                done:
+                  value:
+                    device_id: 5c9a7e21-0d3b-4f8e-a1c2-7b6d5e4f3a21
+                    command: set_temperature
+                    status: done
+                    executed_at: "2026-09-13T10:21:00Z"
+        "400":
+          description: неверный запрос или тип устройства не поддерживает команду
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                unsupported:
+                  value:
+                    code: command_not_supported
+                    message: тип heating_relay не поддерживает команду open
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/DeviceUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: токен пользователя из user-service
+
+  parameters:
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      description: идентификатор устройства
+      schema:
+        type: string
+        format: uuid
+      example: 5c9a7e21-0d3b-4f8e-a1c2-7b6d5e4f3a21
+
+  schemas:
+    DeviceCreate:
+      type: object
+      required: [house_id, type_code, serial_number, name]
+      properties:
+        house_id:
+          type: string
+          format: uuid
+        type_code:
+          type: string
+          description: код типа из каталога device_types
+        serial_number:
+          type: string
+        name:
+          type: string
+
+    Device:
+      type: object
+      required: [id, house_id, type, serial_number, name, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        house_id:
+          type: string
+          format: uuid
+        module_id:
+          type: [string, "null"]
+          format: uuid
+        type:
+          $ref: "#/components/schemas/DeviceTypeRef"
+        serial_number:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/DeviceStatus"
+        created_at:
+          type: string
+          format: date-time
+
+    DeviceTypeRef:
+      type: object
+      required: [code, name, category]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          enum: [heating, lighting, gate, camera, sensor]
+
+    DeviceStatus:
+      type: string
+      enum: ["on", "off"]
+      description: текущее состояние устройства, включено или выключено
+
+    DeviceStateUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/DeviceStatus"
+
+    CommandRequest:
+      type: object
+      required: [command]
+      properties:
+        command:
+          type: string
+          description: команда из capabilities типа устройства
+        params:
+          type: object
+          additionalProperties: true
+
+    CommandResult:
+      type: object
+      required: [device_id, command, status, executed_at]
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        command:
+          type: string
+        status:
+          type: string
+          enum: [done]
+        executed_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+  responses:
+    BadRequest:
+      description: неверный запрос
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            validation:
+              value:
+                code: validation_error
+                message: "status: допустимо on или off"
+    Unauthorized:
+      description: нет токена пользователя или он недействителен
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            noToken:
+              value:
+                code: unauthorized
+                message: нужен токен пользователя
+    NotFound:
+      description: устройство не найдено или находится в чужом доме
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            notFound:
+              value:
+                code: device_not_found
+                message: устройство 5c9a7e21-0d3b-4f8e-a1c2-7b6d5e4f3a21 не найдено
+    DeviceUnavailable:
+      description: устройство не подтвердило команду за таймаут
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            offline:
+              value:
+                code: device_unavailable
+                message: устройство не ответило
+    InternalError:
+      description: ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            internal:
+              value:
+                code: internal_error
+                message: внутренняя ошибка сервера

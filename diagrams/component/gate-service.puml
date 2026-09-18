@@ -1,0 +1,21 @@
+@startuml gate-service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title gate-service: диаграмма компонентов
+
+Container(api_gw, "api gateway", "nginx")
+Container(device_svc, "device-service", "go")
+
+Container_Boundary(svc, "gate-service") {
+    Component(api, "rest api", "go", "/gates/{deviceId}/open, /close, /lock, /unlock")
+    Component(gate, "GateService", "go", "доступ на участок: открыть, закрыть, запереть и отпереть ворота, переводит действия в команды устройству")
+    Component(client, "DeviceClient", "go", "GET /devices/{id}, POST /devices/{id}/commands с токеном пользователя")
+}
+
+Rel(api_gw, api, "управление воротами", "rest")
+Rel(api, gate, "вызывает")
+Rel(gate, client, "проверка устройства, команды")
+Rel(client, device_svc, "rest")
+
+SHOW_LEGEND()
+@enduml

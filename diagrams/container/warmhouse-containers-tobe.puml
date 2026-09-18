@@ -1,0 +1,59 @@
+@startuml warmhouse-containers-tobe
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Container.puml
+
+title диаграмма контейнеров to-be
+
+Person(user, "пользователь", "владелец дома, сам подключает устройства и управляет ими")
+System_Ext(devices, "устройства партнёров", "датчики, реле отопления, освещение, ворота, камеры, подключены к интернету в доме")
+
+System_Boundary(eco, "экосистема умного дома (saas)") {
+    Container(web, "web-приложение", "spa", "личный кабинет: дома, устройства, управление, телеметрия")
+    Container(api_gw, "api gateway", "nginx", "единая точка входа: проверка токена и маршрутизация в сервисы")
+
+    Container(user_svc, "user-service", "go", "пользователи, дома, токены")
+    Container(device_svc, "device-service", "go", "реестр и подключение устройств, типы, текущее состояние, команды, сценарии, без правил отдельных доменов")
+    Container(heating_svc, "heating-service", "go", "правила отопления: целевая температура и режим")
+    Container(lighting_svc, "lighting-service", "go", "правила освещения: включение, выключение, яркость")
+    Container(gate_svc, "gate-service", "go", "доступ на участок: открыть, закрыть, запереть, отпереть ворота")
+    Container(surveillance_svc, "surveillance-service", "go", "просмотр камер")
+    Container(telemetry_svc, "telemetry-service", "go", "хранение и выдача истории измерений")
+
+    Container(device_gw, "device-gateway", "go", "интеграционный контур: адаптеры протоколов партнёров")
+    ContainerQueue(mqtt, "mqtt-брокер", "mqtt", "единый маршрут событий устройств: телеметрия, состояние, команды")
+
+    ContainerDb(user_db, "user-db", "postgresql", "пользователи, дома")
+    ContainerDb(device_db, "device-db", "postgresql", "устройства, модули, типы устройств, сценарии")
+    ContainerDb(telemetry_db, "telemetry-db", "postgresql", "телеметрия")
+}
+
+Rel(user, web, "использует", "https")
+Rel(web, api_gw, "запросы к api", "https")
+
+Rel(api_gw, user_svc, "вход, дома; проверка токена", "rest")
+Rel(api_gw, device_svc, "устройства и сценарии", "rest")
+Rel(api_gw, heating_svc, "отопление", "rest")
+Rel(api_gw, lighting_svc, "освещение", "rest")
+Rel(api_gw, gate_svc, "ворота", "rest")
+Rel(api_gw, surveillance_svc, "видео", "rest")
+Rel(api_gw, telemetry_svc, "история телеметрии", "rest")
+
+Rel(device_svc, user_svc, "дома пользователя для проверки доступа", "rest")
+Rel(heating_svc, device_svc, "состояние и команды реле", "rest")
+Rel(lighting_svc, device_svc, "состояние и команды освещения", "rest")
+Rel(gate_svc, device_svc, "команды воротам", "rest")
+Rel(surveillance_svc, device_svc, "данные камеры", "rest")
+Rel(telemetry_svc, device_svc, "проверяет доступ к устройству", "rest")
+Rel(surveillance_svc, devices, "получает видеопоток", "https")
+
+BiRel(devices, device_gw, "данные и команды", "https, протоколы партнёров")
+Rel(device_gw, device_svc, "протокол и тип устройства", "rest")
+BiRel(device_gw, mqtt, "публикует телеметрию и состояние, получает команды", "mqtt")
+BiRel(device_svc, mqtt, "публикует команды, получает состояние и телеметрию", "mqtt")
+Rel(mqtt, telemetry_svc, "devices/+/telemetry", "mqtt")
+
+Rel(user_svc, user_db, "читает и пишет", "sql")
+Rel(device_svc, device_db, "читает и пишет", "sql")
+Rel(telemetry_svc, telemetry_db, "читает и пишет", "sql")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,26 @@
+@startuml user-service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title user-service: диаграмма компонентов
+
+Container(api_gw, "api gateway", "nginx")
+Container(device_svc, "device-service", "go")
+ContainerDb(db, "user-db", "postgresql", "users, houses")
+
+Container_Boundary(svc, "user-service") {
+    Component(api, "rest api", "go", "/auth/login, /auth/verify, /users, /houses")
+    Component(auth, "AuthService", "go", "регистрация, вход, выдача и проверка токена")
+    Component(houses, "HouseService", "go", "дома пользователя")
+    Component(repo, "Repository", "go", "доступ к пользователям и домам")
+}
+
+Rel(api_gw, api, "вход, дома; проверка токена", "rest")
+Rel(device_svc, api, "проверка дома пользователя", "rest")
+Rel(api, auth, "вызывает")
+Rel(api, houses, "вызывает")
+Rel(auth, repo, "пользователи")
+Rel(houses, repo, "дома")
+Rel(repo, db, "читает и пишет", "sql")
+
+SHOW_LEGEND()
+@enduml
