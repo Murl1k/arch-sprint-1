@@ -3,7 +3,7 @@
 
 title surveillance-service: диаграмма компонентов
 
-Container(web, "web-приложение", "spa")
+Container(api_gw, "api gateway", "nginx")
 Container(device_svc, "device-service", "go")
 System_Ext(cameras, "камеры партнёров", "видеопоток по https")
 
@@ -13,7 +13,7 @@ Container_Boundary(svc, "surveillance-service") {
     Component(client, "DeviceClient", "go", "GET /devices/{id}: данные камеры")
 }
 
-Rel(web, api, "видео", "rest")
+Rel(api_gw, api, "видео", "rest")
 Rel(api, stream, "вызывает")
 Rel(stream, client, "данные камеры")
 Rel(client, device_svc, "rest")

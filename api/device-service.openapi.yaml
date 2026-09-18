@@ -5,7 +5,7 @@ info:
   description: |
     подключение устройств, данные устройства, обновление состояния и команды
 
-    доступ: запрос идёт с токеном пользователя из user-service, device-service работает только с устройствами из домов пользователя, дома берёт из user-service, чужое устройство даёт 404
+    доступ: запрос приходит через api gateway с токеном пользователя, device-service работает только с устройствами из домов пользователя, дома берёт из user-service, чужое устройство даёт 404
 servers:
   - url: /api/v1
 security:
@@ -130,7 +130,7 @@ paths:
     patch:
       operationId: updateDeviceState
       summary: обновить состояние устройства
-      description: включает или выключает устройство, device-service передаёт команду устройству и сохраняет новый статус
+      description: включает или выключает устройство, device-service публикует команду в mqtt, device-gateway передаёт её устройству, после подтверждения статус сохраняется
       parameters:
         - $ref: "#/components/parameters/DeviceId"
       requestBody:
@@ -180,7 +180,7 @@ paths:
     post:
       operationId: sendCommand
       summary: отправить команду устройству
-      description: команда проверяется по списку команд типа устройства и отправляется устройству через адаптер протокола
+      description: команда проверяется по списку команд типа устройства и публикуется в mqtt, device-gateway передаёт её устройству и возвращает подтверждение
       parameters:
         - $ref: "#/components/parameters/DeviceId"
       requestBody:
@@ -388,7 +388,7 @@ components:
                 code: device_not_found
                 message: устройство 5c9a7e21-0d3b-4f8e-a1c2-7b6d5e4f3a21 не найдено
     DeviceUnavailable:
-      description: устройство не отвечает
+      description: устройство не подтвердило команду за таймаут
       content:
         application/json:
           schema:

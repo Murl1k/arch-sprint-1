@@ -3,23 +3,23 @@
 
 title telemetry-service: диаграмма компонентов
 
-Container(web, "web-приложение", "spa")
+Container(api_gw, "api gateway", "nginx")
 Container(device_svc, "device-service", "go")
-ContainerQueue(broker, "брокер сообщений", "pub/sub")
+ContainerQueue(mqtt, "mqtt-брокер", "mqtt")
 ContainerDb(db, "telemetry-db", "postgresql", "telemetry_data")
 
 Container_Boundary(svc, "telemetry-service") {
     Component(api, "rest api", "go", "/devices/{deviceId}/telemetry")
     Component(client, "DeviceClient", "go", "GET /devices/{id} с токеном пользователя: устройство из дома пользователя")
-    Component(consumer, "TelemetryConsumer", "go", "читает device.telemetry")
+    Component(consumer, "TelemetryConsumer", "go", "подписан на devices/+/telemetry")
     Component(telemetry, "TelemetryService", "go", "запись измерений и выборка истории")
     Component(repo, "Repository", "go", "доступ к измерениям")
 }
 
-Rel(web, api, "история телеметрии с токеном пользователя", "rest")
+Rel(api_gw, api, "история телеметрии", "rest")
 Rel(api, client, "проверка доступа к устройству")
 Rel(client, device_svc, "rest")
-Rel(broker, consumer, "device.telemetry", "pub/sub")
+Rel(mqtt, consumer, "devices/+/telemetry", "mqtt")
 Rel(api, telemetry, "выборка")
 Rel(consumer, telemetry, "новое измерение")
 Rel(telemetry, repo, "читает и пишет")

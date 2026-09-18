@@ -4,41 +4,50 @@ title включение отопления (уровень кода, после
 autonumber
 actor "пользователь" as user
 participant "web-приложение" as web
+participant "api gateway" as gw
+participant "user-service" as usersvc
 participant "heating-service" as heating
 participant "device-service" as devsvc
-participant "адаптер протокола" as adapter
+queue "mqtt-брокер" as mqtt
+participant "device-gateway" as dgw
 participant "реле отопления" as relay
 participant "датчик температуры" as sensor
-queue "брокер сообщений" as broker
 participant "telemetry-service" as tel
 
 user -> web : включает отопление
-web -> heating : POST /heating/{deviceId}/power (on: true)
+web -> gw : POST /api/v1/heating/{deviceId}/power (on: true)
+gw -> usersvc : GET /auth/verify
+usersvc --> gw : 200 (user_id)
+gw -> heating : POST /heating/{deviceId}/power (on: true)
 heating -> devsvc : GET /devices/{deviceId}
 devsvc --> heating : 200 (category: heating)
 heating -> devsvc : PATCH /devices/{deviceId}/state (status: on)
 devsvc -> devsvc : CommandHandler проверяет команду по типу устройства
-devsvc -> adapter : set_power (on: true)
-adapter -> relay : команда в протоколе партнёра
+devsvc -> mqtt : devices/{deviceId}/commands (request_id, set_power, on: true)
+mqtt -> dgw : devices/{deviceId}/commands
+dgw -> relay : команда в протоколе партнёра
 alt реле ответило
-    relay --> adapter : подтверждение
-    adapter --> devsvc : ok
+    relay --> dgw : подтверждение
+    dgw -> mqtt : devices/{deviceId}/replies (request_id, ok)
+    mqtt -> devsvc : devices/{deviceId}/replies
     devsvc -> devsvc : DeviceStateManager сохраняет status: on
     devsvc --> heating : 200 (status: on)
-    heating --> web : 200
+    heating --> gw : 200
+    gw --> web : 200
     web --> user : отопление включено
-else реле недоступно
-    adapter --> devsvc : ошибка связи
+else нет подтверждения за таймаут
     devsvc --> heating : 503
-    heating --> web : 503
+    heating --> gw : 503
+    gw --> web : 503
     web --> user : устройство недоступно
 end
 
 == телеметрия ==
 
-sensor -> adapter : температура (протокол партнёра)
-adapter -> devsvc : измерение
-devsvc -> broker : device.telemetry (device_id, temperature, 21.5)
-broker -> tel : device.telemetry
+sensor -> dgw : температура (протокол партнёра)
+dgw -> mqtt : devices/{deviceId}/telemetry (temperature: 21.5)
+mqtt -> tel : devices/{deviceId}/telemetry
 tel -> tel : сохраняет измерение
+mqtt -> devsvc : devices/{deviceId}/telemetry
+devsvc -> devsvc : ScenarioEngine проверяет условия сценариев
 @enduml

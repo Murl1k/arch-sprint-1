@@ -3,16 +3,16 @@
 
 title gate-service: диаграмма компонентов
 
-Container(web, "web-приложение", "spa")
+Container(api_gw, "api gateway", "nginx")
 Container(device_svc, "device-service", "go")
 
 Container_Boundary(svc, "gate-service") {
     Component(api, "rest api", "go", "/gates/{deviceId}/open, /close, /lock, /unlock")
-    Component(gate, "GateService", "go", "открывает и закрывает ворота, запирает и отпирает замок, проверяет, что устройство относится к воротам")
+    Component(gate, "GateService", "go", "доступ на участок: открыть, закрыть, запереть и отпереть ворота, переводит действия в команды устройству")
     Component(client, "DeviceClient", "go", "GET /devices/{id}, POST /devices/{id}/commands с токеном пользователя")
 }
 
-Rel(web, api, "управление воротами", "rest")
+Rel(api_gw, api, "управление воротами", "rest")
 Rel(api, gate, "вызывает")
 Rel(gate, client, "проверка устройства, команды")
 Rel(client, device_svc, "rest")

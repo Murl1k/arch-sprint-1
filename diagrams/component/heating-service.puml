@@ -3,16 +3,16 @@
 
 title heating-service: диаграмма компонентов
 
-Container(web, "web-приложение", "spa")
+Container(api_gw, "api gateway", "nginx")
 Container(device_svc, "device-service", "go")
 
 Container_Boundary(svc, "heating-service") {
     Component(api, "rest api", "go", "/heating/{deviceId}/power, /heating/{deviceId}/temperature")
-    Component(heating, "HeatingService", "go", "включение, выключение и целевая температура, проверяет, что устройство относится к отоплению")
+    Component(heating, "HeatingService", "go", "правила отопления: включение, целевая температура и режим, переводит их в команды реле")
     Component(client, "DeviceClient", "go", "GET /devices/{id}, PATCH /devices/{id}/state, POST /devices/{id}/commands")
 }
 
-Rel(web, api, "управление отоплением", "rest")
+Rel(api_gw, api, "управление отоплением", "rest")
 Rel(api, heating, "вызывает")
 Rel(heating, client, "проверка устройства, состояние, команды")
 Rel(client, device_svc, "rest")

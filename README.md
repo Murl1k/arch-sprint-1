@@ -27,8 +27,16 @@
 ### 3. Определение доменов и границы контекстов
 
 - as-is: управление отоплением, мониторинг температуры, реестр датчиков, подключение оборудования выполняет специалист вне системы
-- to-be: пользователи и дома (user-service), управление устройствами (device-service), телеметрия (telemetry-service), отопление, освещение, ворота и видеонаблюдение (по сервису на каждый), сценарии автоматизации (в device-service)
-- каждый контекст выделен в микросервис, сценарии живут в device-service рядом с командами устройствам
+- to-be, контексты и их ответственность:
+  - пользователи и дома (user-service): учётные записи, дома, токены
+  - устройства (device-service): реестр, подключение, типы, текущее состояние, команды и пользовательские сценарии, без правил отдельных доменов
+  - интеграция устройств (device-gateway и mqtt): протоколы партнёров, приём телеметрии и состояния, доставка команд
+  - отопление (heating-service): целевая температура и режим, переводит их в команды реле
+  - освещение (lighting-service): включение, выключение, яркость
+  - доступ на участок (gate-service): открыть, закрыть, запереть, отпереть ворота
+  - видеонаблюдение (surveillance-service): просмотр камер
+  - телеметрия (telemetry-service): хранение и выдача истории измерений
+- доменные сервисы решают, что нужно сделать, а device-service знает, какому устройству и как отправить команду
 
 ### **4. Проблемы монолитного решения**
 
@@ -48,16 +56,17 @@
 
 [диаграмма контейнеров](diagrams/container/warmhouse-containers-tobe.png) ([исходник](diagrams/container/warmhouse-containers-tobe.puml))
 
-- сервисы отопления, освещения, ворот и видеонаблюдения управляют устройствами через device-service
-- device-service работает с устройствами партнёров через адаптеры протоколов и публикует телеметрию в брокер сообщений, её сохраняет telemetry-service
-- новый тип датчика добавляется записью в каталог типов устройств, новый протокол партнёра добавляется адаптером
+- наружу открыты только web-приложение и api gateway, gateway проверяет токен в user-service и направляет запросы в сервисы
+- доменные сервисы отправляют команды через device-service, он публикует их в mqtt
+- интеграционный контур: device-gateway переводит протоколы партнёров в единый формат и обменивается событиями с mqtt
+- mqtt единый маршрут событий устройств: телеметрию читают telemetry-service и сценарии в device-service, команды идут в обратную сторону
+- новый тип датчика добавляется записью в каталог типов устройств, новый протокол партнёра добавляется адаптером в device-gateway
 - сценарии хранятся в device-service: обработчик проверяет условия по телеметрии и расписанию и отправляет команды устройствам
-- ворота: открыть, закрыть, запереть и отпереть
-- доступ: запросы идут с токеном пользователя из user-service, device-service проверяет, что устройство из дома пользователя, остальные сервисы проверяют доступ через него
+- доступ к устройствам проверяет device-service по домам пользователя, остальные сервисы проверяют доступ через него
 
 **Диаграмма компонентов (Components)**
 
-[user-service](diagrams/component/user-service.png), [device-service](diagrams/component/device-service.png), [telemetry-service](diagrams/component/telemetry-service.png), [heating-service](diagrams/component/heating-service.png), [lighting-service](diagrams/component/lighting-service.png), [gate-service](diagrams/component/gate-service.png), [surveillance-service](diagrams/component/surveillance-service.png)
+[user-service](diagrams/component/user-service.png), [device-service](diagrams/component/device-service.png), [device-gateway](diagrams/component/device-gateway.png), [telemetry-service](diagrams/component/telemetry-service.png), [heating-service](diagrams/component/heating-service.png), [lighting-service](diagrams/component/lighting-service.png), [gate-service](diagrams/component/gate-service.png), [surveillance-service](diagrams/component/surveillance-service.png)
 
 исходники puml лежат рядом с картинками
 
@@ -68,11 +77,12 @@
 план перехода:
 
 1. контейнеризация монолита
-2. device-service и telemetry-service, монолит берёт температуру из telemetry-service
-3. user-service
-4. heating-service, управление отоплением уходит из монолита
-5. lighting-service, gate-service, surveillance-service
-6. вывод монолита из эксплуатации
+2. api gateway перед монолитом, новые сервисы подключаются к нему по мере готовности
+3. mqtt-брокер, device-gateway и telemetry-service, монолит берёт температуру из telemetry-service
+4. device-service и user-service
+5. heating-service, управление отоплением уходит из монолита
+6. lighting-service, gate-service, surveillance-service
+7. вывод монолита из эксплуатации
 
 # Задание 3. Разработка ER-диаграммы
 
@@ -88,12 +98,12 @@
 ### 1. Тип API
 
 - rest для запросов, где нужен немедленный ответ: подключение устройства, данные, состояние и команды
-- asyncapi для телеметрии: device-service отправляет измерения в брокер и не ждёт ответа
+- asyncapi для телеметрии: device-gateway публикует измерения в mqtt и не ждёт ответа
 
 ### 2. Документация API
 
 - [device-service, openapi](api/device-service.openapi.yaml): подключение устройства, информация об устройстве, обновление состояния, отправка команды
-- [телеметрия, asyncapi](api/telemetry.asyncapi.yaml): уведомление о новом измерении
+- [телеметрия, asyncapi](api/telemetry.asyncapi.yaml): уведомление о новом измерении в mqtt
 
 # Задание 5. Работа с docker и docker-compose
 

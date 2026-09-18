@@ -3,16 +3,16 @@
 
 title lighting-service: диаграмма компонентов
 
-Container(web, "web-приложение", "spa")
+Container(api_gw, "api gateway", "nginx")
 Container(device_svc, "device-service", "go")
 
 Container_Boundary(svc, "lighting-service") {
     Component(api, "rest api", "go", "/lighting/{deviceId}/power, /lighting/{deviceId}/brightness")
-    Component(lighting, "LightingService", "go", "включение, выключение и яркость, проверяет, что устройство относится к освещению")
+    Component(lighting, "LightingService", "go", "правила освещения: включение, выключение и яркость, переводит их в команды светильникам")
     Component(client, "DeviceClient", "go", "GET /devices/{id}, PATCH /devices/{id}/state, POST /devices/{id}/commands")
 }
 
-Rel(web, api, "управление освещением", "rest")
+Rel(api_gw, api, "управление освещением", "rest")
 Rel(api, lighting, "вызывает")
 Rel(lighting, client, "проверка устройства, состояние, команды")
 Rel(client, device_svc, "rest")
