@@ -1,0 +1,23 @@
+@startuml surveillance-service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title surveillance-service: диаграмма компонентов
+
+Container(api_gw, "api gateway", "nginx")
+Container(device_svc, "device-service", "go")
+System_Ext(cameras, "камеры партнёров", "видеопоток по https")
+
+Container_Boundary(svc, "surveillance-service") {
+    Component(api, "rest api", "go", "/cameras/{deviceId}/stream")
+    Component(stream, "StreamService", "go", "отдаёт пользователю видеопоток камеры")
+    Component(client, "DeviceClient", "go", "GET /devices/{id}: данные камеры")
+}
+
+Rel(api_gw, api, "видео", "rest")
+Rel(api, stream, "вызывает")
+Rel(stream, client, "данные камеры")
+Rel(client, device_svc, "rest")
+Rel(stream, cameras, "получает видеопоток", "https")
+
+SHOW_LEGEND()
+@enduml

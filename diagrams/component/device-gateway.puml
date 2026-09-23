@@ -1,0 +1,25 @@
+@startuml device-gateway
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.14.0/C4_Component.puml
+
+title device-gateway: диаграмма компонентов
+
+System_Ext(devices, "устройства партнёров", "датчики, реле, освещение, ворота")
+Container(device_svc, "device-service", "go")
+ContainerQueue(mqtt, "mqtt-брокер", "mqtt")
+
+Container_Boundary(svc, "device-gateway") {
+    Component(conn, "ConnectionManager", "go", "держит соединения с устройствами партнёров")
+    Component(adapters, "ProtocolAdapters", "go", "по адаптеру на протокол партнёра: переводят сообщения в единый формат и обратно, новый протокол добавляется новым адаптером")
+    Component(client, "DeviceClient", "go", "GET /devices/{id}: протокол и тип устройства")
+    Component(bridge, "MqttBridge", "go", "публикует телеметрию, состояние и подтверждения, подписан на команды")
+}
+
+BiRel(devices, conn, "данные и команды", "https, протоколы партнёров")
+BiRel(conn, adapters, "сообщения устройства")
+Rel(adapters, client, "протокол устройства")
+Rel(client, device_svc, "rest")
+BiRel(adapters, bridge, "единый формат")
+BiRel(bridge, mqtt, "devices/{id}/telemetry, state, replies; devices/{id}/commands", "mqtt")
+
+SHOW_LEGEND()
+@enduml

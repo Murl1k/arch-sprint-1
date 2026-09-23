@@ -1,0 +1,106 @@
+@startuml warmhouse-er
+title er-диаграмма
+
+hide circle
+skinparam linetype ortho
+
+package "user-service" {
+    entity users {
+        * id : uuid <<pk>>
+        --
+        * email : varchar(255) <<unique>>
+        * password_hash : varchar(255)
+        * name : varchar(100)
+        * created_at : timestamptz
+    }
+
+    entity houses {
+        * id : uuid <<pk>>
+        --
+        * user_id : uuid <<fk users>>
+        * name : varchar(100)
+        * address : varchar(255)
+        * created_at : timestamptz
+    }
+}
+
+package "device-service" {
+    entity device_types {
+        * id : uuid <<pk>>
+        --
+        * code : varchar(50) <<unique>>
+        * name : varchar(100)
+        * category : varchar(20)
+        * protocol : varchar(50)
+        * capabilities : jsonb
+    }
+
+    entity modules {
+        * id : uuid <<pk>>
+        --
+        * house_id : uuid
+        * serial_number : varchar(64) <<unique>>
+        * name : varchar(100)
+        * status : varchar(20)
+    }
+
+    entity devices {
+        * id : uuid <<pk>>
+        --
+        * type_id : uuid <<fk device_types>>
+        * house_id : uuid
+        module_id : uuid <<fk modules>>
+        * serial_number : varchar(64) <<unique>>
+        * name : varchar(100)
+        * status : varchar(20)
+        * created_at : timestamptz
+    }
+
+    entity scenarios {
+        * id : uuid <<pk>>
+        --
+        * house_id : uuid
+        * name : varchar(100)
+        * trigger : jsonb
+        * enabled : boolean
+        * created_at : timestamptz
+    }
+
+    entity scenario_actions {
+        * id : uuid <<pk>>
+        --
+        * scenario_id : uuid <<fk scenarios>>
+        * device_id : uuid <<fk devices>>
+        * command : varchar(50)
+        params : jsonb
+        * position : int
+    }
+}
+
+package "telemetry-service" {
+    entity telemetry_data {
+        * id : bigint <<pk>>
+        --
+        * device_id : uuid
+        * metric : varchar(50)
+        * value : double precision
+        unit : varchar(20)
+        * recorded_at : timestamptz
+    }
+}
+
+users ||--o{ houses : владеет
+device_types ||--o{ devices : тип
+modules |o--o{ devices : входит в
+houses ||..o{ modules
+houses ||..o{ devices
+devices ||..o{ telemetry_data : генерирует
+scenarios ||--|{ scenario_actions : содержит
+devices ||--o{ scenario_actions : выполняет
+houses ||..o{ scenarios
+
+legend bottom left
+сплошная линия: внешний ключ внутри бд одного сервиса
+пунктир: связь между сервисами по id, без внешнего ключа
+endlegend
+@enduml
